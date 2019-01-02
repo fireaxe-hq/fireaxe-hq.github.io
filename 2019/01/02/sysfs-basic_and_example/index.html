@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="linux,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="本文基于linux 4.x代码，对sysfs的基本概念、实现原理进行了介绍；结合cpufreq分析了sysfs的使用方法；最后，通过一个例子对全文进行了总结。">
+<meta name="keywords" content="linux">
+<meta property="og:type" content="article">
+<meta property="og:title" content="sysfs基本原理与使用方法">
+<meta property="og:url" content="https://fireaxe-hq.github.io/2019/01/02/sysfs-basic_and_example/index.html">
+<meta property="og:site_name" content="Wicca&#39;s Blog">
+<meta property="og:description" content="本文基于linux 4.x代码，对sysfs的基本概念、实现原理进行了介绍；结合cpufreq分析了sysfs的使用方法；最后，通过一个例子对全文进行了总结。">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://wx1.sinaimg.cn/mw690/007xRyMqly1fys00tpjqrg30fw08q0t5.gif">
+<meta property="og:image" content="http://wx4.sinaimg.cn/mw690/007xRyMqly1fys00m97kaj30ih0a3mxl.jpg">
+<meta property="og:updated_time" content="2019-01-02T12:04:21.168Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="sysfs基本原理与使用方法">
+<meta name="twitter:description" content="本文基于linux 4.x代码，对sysfs的基本概念、实现原理进行了介绍；结合cpufreq分析了sysfs的使用方法；最后，通过一个例子对全文进行了总结。">
+<meta name="twitter:image" content="http://wx1.sinaimg.cn/mw690/007xRyMqly1fys00tpjqrg30fw08q0t5.gif">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://fireaxe-hq.github.io/2019/01/02/sysfs-basic_and_example/">
+
+
+
+
+
+  <title>sysfs基本原理与使用方法 | Wicca's Blog</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope="" itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope="" itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Wicca's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br>
+            
+            About
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            Tags
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            Categories
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope="" itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fireaxe-hq.github.io/2019/01/02/sysfs-basic_and_example/">
+
+    <span hidden itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Qiang Hao">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/tiger.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope="" itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Wicca's Blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">sysfs基本原理与使用方法</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2019-01-02T19:21:00+08:00">
+                2019-01-02
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope="" itemtype="http://schema.org/Thing">
+                  <a href="/categories/linux-component/" itemprop="url" rel="index">
+                    <span itemprop="name">linux component</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i>
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>
+            </span>
+          
+
+          
+            <div class="post-wordcount">
+              
+                
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-file-word-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Words count in article&#58;</span>
+                
+                <span title="Words count in article">
+                  6.2k
+                </span>
+              
+
+              
+                <span class="post-meta-divider">|</span>
+              
+
+              
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-clock-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Reading time &asymp;</span>
+                
+                <span title="Reading time">
+                  26
+                </span>
+              
+            </div>
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本文基于linux 4.x代码，对sysfs的基本概念、实现原理进行了介绍；结合cpufreq分析了sysfs的使用方法；最后，通过一个例子对全文进行了总结。</p>
+<a id="more"></a>
+<h2 id="参考文档"><a href="#参考文档" class="headerlink" title="参考文档"></a>参考文档</h2><p><a href="https://www.ibm.com/developerworks/cn/linux/l-cn-sysfs/" target="_blank" rel="noopener">https://www.ibm.com/developerworks/cn/linux/l-cn-sysfs/</a></p>
+<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><p>sysfs 给应用程序提供了统一访问设备的接口，但可以看到， sysfs 仅仅是提供了一个可以统一访问设备的框架，但究竟是否支持 sysfs 还需要各设备驱动程序的编程支持；在 2.6 内核诞生 5年以来的发展中，很多子系统、设备驱动程序逐渐转向了 sysfs 作为与用户空间友好的接口，但仍然也存在大量的代码还在使用旧的 proc 或虚拟字符设备的 ioctl 方式；如果仅从最终用户的角度来说， sysfs 与 proc 都是在提供相同或类似的功能，对于旧的 proc 代码，没有绝对的必要去做 proc 至 sysfs 的升级；因此在可预见的将来， sysfs 会与 proc, debugfs, configfs 等共存很长一段时间。<br>sysfs 虚拟文件系统提供了一种比 proc 更为理想的访问内核数据的途径</p>
+<p>sysfs 文件系统总是被挂载在 /sys 挂载点上。虽然在较早期的2.6内核系统上并没有规定 sysfs 的标准挂载位置，可以把 sysfs 挂载在任何位置，但较近的2.6内核修正了这一规则，要求 sysfs 总是挂载在 /sys 目录上；针对以前的 sysfs 挂载位置不固定或没有标准被挂载，有些程序从 /proc/mounts 中解析出 sysfs 是否被挂载以及具体的挂载点，这个步骤现在已经不需要了。<br>sysfs 与 proc 相比有很多优点，最重要的莫过于设计上的清晰。一个 proc 虚拟文件可能有内部格式，如 /proc/scsi/scsi ，它是可读可写的，(其文件权限被错误地标记为了 0444 ！，这是内核的一个BUG)，并且读写格式不一样，代表不同的操作，应用程序中读到了这个文件的内容一般还需要进行字符串解析，而在写入时需要先用字符串格式化按指定的格式写入字符串进行操作；相比而言， sysfs 的设计原则是一个属性文件只做一件事情， sysfs 属性文件一般只有一个值，直接读取或写入。整个 /proc/scsi 目录在2.6内核中已被标记为过时(LEGACY)，它的功能已经被相应的 /sys 属性文件所完全取代。新设计的内核机制应该尽量使用 sysfs 机制，而将 proc 保留给纯净的“进程文件系统”。</p>
+<h2 id="sysfs目录结构"><a href="#sysfs目录结构" class="headerlink" title="sysfs目录结构"></a>sysfs目录结构</h2><p>“/sys”下的目录结构是经过精心设计的：在 /sys/devices 下是所有设备的真实对象，包括如视频卡和以太网卡等真实的设备，也包括 ACPI 等不那么显而易见的真实设备、还有 tty, bonding 等纯粹虚拟的设备；在其它目录如 class, bus 等中则在分类的目录中含有大量对 devices 中真实对象引用的符号链接文件。</p>
+<table>
+<thead>
+<tr>
+<th>/sys 的子目录</th>
+<th>所包含的内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/sys/devices</td>
+<td>这是内核对系统中所有设备的分层次表达模型，也是 /sys 文件系统管理设备的最重要的目录结构，下文会对它的内部结构作进一步分析；</td>
+</tr>
+<tr>
+<td>/sys/dev</td>
+<td>这个目录下维护一个按字符设备和块设备的主次号码(major:minor)链接到真实的设备(/sys/devices下)的符号链接文件，它是在内核 2.6.26 首次引入；</td>
+</tr>
+<tr>
+<td>/sys/bus</td>
+<td>这是内核设备按总线类型分层放置的目录结构， devices 中的所有设备都是连接于某种总线之下，在这里的每一种具体总线之下可以找到每一个具体设备的符号链接，它也是构成 Linux 统一设备模型的一部分；</td>
+</tr>
+<tr>
+<td>/sys/class</td>
+<td>这是按照设备功能分类的设备模型，如系统所有输入设备都会出现在 /sys/class/input 之下，而不论它们是以何种总线连接到系统。它也是构成 Linux 统一设备模型的一部分；</td>
+</tr>
+<tr>
+<td>/sys/block</td>
+<td>这里是系统中当前所有的块设备所在，按照功能来说放置在 /sys/class 之下会更合适，但只是由于历史遗留因素而一直存在于 /sys/block, 但从 2.6.22 开始就已标记为过时，只有在打开了 CONFIG_SYSFS_DEPRECATED 配置下编译才会有这个目录的存在，并且在 2.6.26 内核中已正式移到 /sys/class/block, 旧的接口 /sys/block 为了向后兼容保留存在，但其中的内容已经变为指向它们在 /sys/devices/ 中真实设备的符号链接文件；</td>
+</tr>
+<tr>
+<td>/sys/firmware</td>
+<td>这里是系统加载固件机制的对用户空间的接口，关于固件有专用于固件加载的一套API，在附录 LDD3 一书中有关于内核支持固件加载机制的更详细的介绍；</td>
+</tr>
+<tr>
+<td>/sys/fs</td>
+<td>这里按照设计是用于描述系统中所有文件系统，包括文件系统本身和按文件系统分类存放的已挂载点，但目前只有 fuse,ext4 等少数文件系统支持 sysfs 接口，一些传统的虚拟文件系统(VFS)层次控制参数仍然在 sysctl (/proc/sys/fs) 接口中；</td>
+</tr>
+<tr>
+<td>/sys/kernel</td>
+<td>这里是内核所有可调整参数的位置，有些内核可调整参数仍然位于 sysctl (/proc/sys/kernel) 接口中 ;</td>
+</tr>
+<tr>
+<td>/sys/module</td>
+<td>这里有系统中所有模块的信息，不论这些模块是以内联(inlined)方式编译到内核映像文件(vmlinuz)中还是编译为外部模块(ko文件)，都可能会出现在 /sys/module 中：编译为外部模块(ko文件)在加载后会出现对应的 /sys/module//, 并且在这个目录下会出现一些属性文件和属性目录来表示此外部模块的一些信息，如版本号、加载状态、所提供的驱动程序等；编译为内联方式的模块则只在当它有非0属性的模块参数时会出现对应的 /sys/module/, 这些模块的可用参数会出现在 /sys/modules//parameters/ 中，如 /sys/module/printk/parameters/time 这个可读写参数控制着内联模块 printk 在打印内核消息时是否加上时间前缀；所有内联模块的参数也可以由 “.=” 的形式写在内核启动参数上，如启动内核时加上参数 “printk.time=1” 与 向 “/sys/module/printk/parameters/time” 写入1的效果相同；没有非0属性参数的内联模块不会出现于此。</td>
+</tr>
+<tr>
+<td>/sys/power</td>
+<td>这里是系统中电源选项，这个目录下有几个属性文件可以用于控制整个机器的电源状态，如可以向其中写入控制命令让机器关机、重启等。</td>
+</tr>
+</tbody>
+</table>
+<p>接下来对 /sys/devices/ 下的目录结构作进一步探讨：</p>
+<h3 id="查看-sys-devices-的目录结构"><a href="#查看-sys-devices-的目录结构" class="headerlink" title="查看 /sys/devices/ 的目录结构"></a>查看 /sys/devices/ 的目录结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ ls -F /sys/devices/</span><br><span class="line">isa/  LNXSYSTM:00/  pci0000:00/  platform/  pnp0/  pnp1/  system/  virtual/</span><br></pre></td></tr></table></figure>
+<p>可以看到，在 /sys/devices/ 目录下是按照设备的基本总线类型分类的目录，再进入进去查看其中的 PCI 类型的设备：</p>
+<h3 id="查看-sys-devices-pci0000-00-的目录结构"><a href="#查看-sys-devices-pci0000-00-的目录结构" class="headerlink" title="查看 /sys/devices/pci0000:00/ 的目录结构"></a>查看 /sys/devices/pci0000:00/ 的目录结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ ls -F /sys/devices/pci0000:00/</span><br><span class="line">0000:00:00.0/  0000:00:02.5/  0000:00:03.1/  0000:00:0e.0/   power/</span><br><span class="line">0000:00:01.0/  0000:00:02.7/  0000:00:03.2/  firmware_node@  uevent</span><br><span class="line">0000:00:02.0/  0000:00:03.0/  0000:00:03.3/  pci_bus/</span><br></pre></td></tr></table></figure>
+<p>在 /sys/devices/pci0000:00/ 目录下是按照 PCI 总线接入的设备号分类存放的目录，再查看其中一个，</p>
+<h3 id="查看-sys-devices-pci0000-00-的目录结构-1"><a href="#查看-sys-devices-pci0000-00-的目录结构-1" class="headerlink" title="查看 /sys/devices/pci0000:00/ 的目录结构"></a>查看 /sys/devices/pci0000:00/ 的目录结构</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ ls -F /sys/devices/pci</span><br><span class="line">0000:00/0000:00:01.0/0000:01:00.0/         device         local_cpus  power/            </span><br><span class="line">subsystem_vendor</span><br><span class="line">broken_parity_status  enable         modalias    resource          uevent</span><br><span class="line">class                 irq            msi_bus     subsystem@        vendor</span><br><span class="line">config                local_cpulist  pci_bus/    subsystem_device</span><br></pre></td></tr></table></figure>
+<p>可以看到，其中有一个目录 0000:01:00.0/, 其它都是属性文件和属性组，而如果对 0000:01:00.0/ 子目录中进行再列表查看则会得到 清单 1 的目录结构。</p>
+<p>继续以上过程可以了解整个目录树的结构，这里把它整理成 图 1. sysfs 目录层次<br><img src="http://wx1.sinaimg.cn/mw690/007xRyMqly1fys00tpjqrg30fw08q0t5.gif" alt="sysfs 目录层次" title="sysfs 目录层次"></p>
+<p>其中涉及到 ksets, kobjects, attrs 等很多术语，这就不得不提到 Linux 统一设备模型。</p>
+<h2 id="从Linux-统一设备模型角度看sysfs"><a href="#从Linux-统一设备模型角度看sysfs" class="headerlink" title="从Linux 统一设备模型角度看sysfs"></a>从Linux 统一设备模型角度看sysfs</h2><p>在 Linux 2.5 内核的开发过程中，人们设计了一套新的设备模型，目的是为了对计算机上的所有设备进行统一地表示和操作，包括设备本身和设备之间的连接关系。这个模型是在分析了 PCI 和 USB 的总线驱动过程中得到的，这两个总线类型能代表当前系统中的大多数设备类型，它们都有完善的热挺拔机制和电源管理的支持，也都有级连机制的支持，以桥接的 PCI/USB 总线控制器的方式可以支持更多的 PCI/USB 设备。为了给所有设备添加统一的电源管理的支持，而不是让每个设备中去独立实现电源管理的支持，人们考虑的是如何尽可能地重用代码；而且在有层次模型的 PCI/USB 总线中，必须以合理形式展示出这个层次关系，这也是电源管理等所要求的必须有层次结构。</p>
+<p>如在一个典型的 PC 系统中，中央处理器(CPU)能直接控制的是 PCI 总线设备，而 USB 总线设备是以一个 PCI 设备(PCI-USB桥)的形式接入在 PCI 总线设备上，外部 USB 设备再接入在 USB 总线设备上；当计算机执行挂起(suspend)操作时， Linux 内核应该以 “外部USB设备-&gt;USB总线设备-&gt;PCI总线设备” 的顺序通知每一个设备将电源挂起；执行恢复(resume)时则以相反的顺序通知；反之如果不按此顺序则将有设备得不到正确的电源状态变迁的通知，将无法正常工作。</p>
+<p>sysfs 是在这个 Linux 统一设备模型的开发过程中的一项副产品(见 参考资料 中 Greg K. Hartman 写作的 LinuxJournal 文章)。为了将这些有层次结构的设备以用户程序可见的方式表达出来，人们很自然想到了利用文件系统的目录树结构（这是以 UNIX 方式思考问题的基础，一切都是文件！）在这个模型中，有几种基本类型，它们的对应关系见 表 2. Linux 统一设备模型的基本结构 ：</p>
+<p>Linux 统一设备模型的基本结构</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>所包含的内容</th>
+<th>对应内核数据结构</th>
+<th>对应/sys项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>设备(Devices)</td>
+<td>设备是此模型中最基本的类型，以设备本身的连接按层次组织</td>
+<td>struct device</td>
+<td>/sys/devices/*/*/…/</td>
+</tr>
+<tr>
+<td>设备驱动(Device Drivers)</td>
+<td>在一个系统中安装多个相同设备，只需要一份驱动程序的支持</td>
+<td>struct device_driver</td>
+<td>/sys/bus/pci/drivers/*/</td>
+</tr>
+<tr>
+<td>总线类型(Bus Types)</td>
+<td>在整个总线级别对此总线上连接的所有设备进行管理</td>
+<td>struct bus_type</td>
+<td>/sys/bus/*/</td>
+</tr>
+<tr>
+<td>设备类别(Device Classes)</td>
+<td>这是按照功能进行分类组织的设备层次树；如 USB 接口和 PS/2 接口的鼠标都是输入设备，都会出现在 /sys/class/input/ 下</td>
+<td>struct class</td>
+<td>/sys/class/*/</td>
+</tr>
+</tbody>
+</table>
+<p>从内核在实现它们时所使用的数据结构来说， Linux 统一设备模型又是以两种基本数据结构进行树型和链表型结构组织的：</p>
+<ul>
+<li>kobject: 在 Linux 设备模型中最基本的对象，它的功能是提供引用计数和维持父子(parent)结构、平级(sibling)目录关系，上面的 device, device_driver 等各对象都是以 kobject 基础功能之上实现的；<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">struct kobject &#123;</span><br><span class="line">    const char              *name;</span><br><span class="line">    struct list_head        entry;</span><br><span class="line">    struct kobject          *parent;</span><br><span class="line">    struct kset             *kset;</span><br><span class="line">    struct kobj_type        *ktype;</span><br><span class="line">    struct sysfs_dirent     *sd;</span><br><span class="line">    struct kref             kref;</span><br><span class="line">    unsigned int state_initialized:1;</span><br><span class="line">    unsigned int state_in_sysfs:1;</span><br><span class="line">    unsigned int state_add_uevent_sent:1;</span><br><span class="line">    unsigned int state_remove_uevent_sent:1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>其中 struct kref 内含一个 atomic_t 类型用于引用计数， parent 是单个指向父节点的指针， entry 用于父 kset 以链表头结构将 kobject 结构维护成双向链表；</p>
+<ul>
+<li>kset: 它用来对同类型对象提供一个包装集合，在内核数据结构上它也是由内嵌一个 kboject 实现，因而它同时也是一个 kobject (面向对象 OOP 概念中的继承关系) ，具有 kobject 的全部功能；<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">struct kset &#123;</span><br><span class="line">    struct list_head list;</span><br><span class="line">    spinlock_t list_lock;</span><br><span class="line">    struct kobject kobj;</span><br><span class="line">    struct kset_uevent_ops *uevent_ops;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>其中的 struct list_head list 用于将集合中的 kobject 按 struct list_head entry 维护成双向链表；</p>
+<p>涉及到文件系统实现来说， sysfs 是一种基于 ramfs 实现的内存文件系统，与其它同样以 ramfs 实现的内存文件系统(configfs,debugfs,tmpfs,…)类似， sysfs 也是直接以 VFS 中的 struct inode 和 struct dentry 等 VFS 层次的结构体直接实现文件系统中的各种对象；同时在每个文件系统的私有数据 (如 dentry-&gt;d_fsdata 等位置) 上，使用了称为 struct sysfs_dirent 的结构用于表示 /sys 中的每一个目录项。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">struct sysfs_dirent &#123;</span><br><span class="line">    atomic_t                s_count;</span><br><span class="line">    atomic_t                s_active;</span><br><span class="line">    struct sysfs_dirent     *s_parent;</span><br><span class="line">    struct sysfs_dirent     *s_sibling;</span><br><span class="line">    const char              *s_name;</span><br><span class="line">    union &#123;</span><br><span class="line">        struct sysfs_elem_dir           s_dir;</span><br><span class="line">        struct sysfs_elem_symlink       s_symlink;</span><br><span class="line">        struct sysfs_elem_attr          s_attr;</span><br><span class="line">        struct sysfs_elem_bin_attr      s_bin_attr;</span><br><span class="line">    &#125;;</span><br><span class="line">    unsigned int            s_flags;</span><br><span class="line">    ino_t                   s_ino;</span><br><span class="line">    umode_t                 s_mode;</span><br><span class="line">    struct iattr            *s_iattr;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>在上面的 kobject 对象中可以看到有向 sysfs_dirent 的指针，因此在sysfs中是用同一种 struct sysfs_dirent 来统一设备模型中的 kset/kobject/attr/attr_group.</p>
+<p>具体在数据结构成员上， sysfs_dirent 上有一个 union 共用体包含四种不同的结构，分别是目录、符号链接文件、属性文件、二进制属性文件；其中目录类型可以对应 kobject，在相应的 s_dir 中也有对 kobject 的指针，因此在内核数据结构， kobject 与 sysfs_dirent 是互相引用的；</p>
+<p>有了这些概念，再来回头看 图 1. sysfs 目录层次图 所表达的 /sys 目录结构就是非常清晰明了:</p>
+<ul>
+<li>在 /sys 根目录之下的都是 kset，它们组织了 /sys 的顶层目录视图；</li>
+<li>在部分 kset 下有二级或更深层次的 kset；</li>
+<li>每个 kset 目录下再包含着一个或多个 kobject，这表示一个集合所包含的 kobject 结构体；</li>
+<li>在 kobject 下有属性(attrs)文件和属性组(attr_group)，属性组就是组织属性的一个目录，它们一起向用户层提供了表示和操作这个 kobject 的属性特征的接口；</li>
+<li>在 kobject 下还有一些符号链接文件，指向其它的 kobject，这些符号链接文件用于组织上面所说的 device, driver, bus_type, class, module 之间的关系；</li>
+<li>不同类型如设备类型的、设备驱动类型的 kobject 都有不同的属性，不同驱动程序支持的 sysfs 接口也有不同的属性文件；而相同类型的设备上有很多相同的属性文件；</li>
+</ul>
+<p>注意，此表内容是按照最新开发中的 2.6.28 内核的更新组织的，在附录资源如 LDD3 等位置中有提到 sysfs 中曾有一种管理对象称为 subsys (子系统对象)，在最新的内核中经过重构认为它是不需要的，它的功能完全可以由 kset 代替，也就是说 sysfs 中只需要一种管理结构是 kset，一种代表具体对象的结构是 kobject，在 kobject 下再用属性文件表示这个对象所具有的属性；</p>
+<h2 id="Sysfs-编程实践-以cpufreq为例"><a href="#Sysfs-编程实践-以cpufreq为例" class="headerlink" title="Sysfs 编程实践 (以cpufreq为例)"></a>Sysfs 编程实践 (以cpufreq为例)</h2><p><img src="http://wx4.sinaimg.cn/mw690/007xRyMqly1fys00m97kaj30ih0a3mxl.jpg" alt="sysfs的结构图" title="sysfs的结构图"><br>上图是是cpufreq子系统中的sysfs的结构图，其实就是驱动统一模型。代码在文件driver/cpufreq/cpufreq.c中。需要明确的是，每个kobject都为一个目录，kobject通过parent指定其上层目录，kobject中的kytpe指定了该kobject目录下有那些属性文件。</p>
+<h3 id="创建子系统目录"><a href="#创建子系统目录" class="headerlink" title="创建子系统目录"></a>创建子系统目录</h3><p>首先是要创建一个kobject节点（全局变量cpufreq_global_kobject），然后通过kobject_create_add_add把它与它的parent kobject节点挂接起来。cpufreq是挂到cpu节点上的，所以这里的parent kobject是cpu子系统的kobject节点：cpu_subsys。从下面的开发可以看到，cpufreq_global_kobject在系统中作为目录cpufreq 被挂接到cpu节点上，cpu节点的路径为“/sys/devices/system/cpu”，所以cpufreq_global_kobject的路径为“/sys/devices/system/cpu/cpufreq”。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cpufreq_global_kobject = kobject_create_and_add(&quot;cpufreq&quot;, &amp;cpu_subsys.dev_root-&gt;kobj);</span><br></pre></td></tr></table></figure></p>
+<h3 id="创建policy目录"><a href="#创建policy目录" class="headerlink" title="创建policy目录"></a>创建policy目录</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">cpufreq子系统下可以挂多个policy，每个policy都是一个独立的目录。</span><br><span class="line">kobject_init(&amp;policy-&gt;kobj, &amp;ktype_cpufreq);</span><br><span class="line">kobject_add(&amp;policy-&gt;kobj, cpufreq_global_kobject,  </span><br><span class="line">                  &quot;policy%u&quot;,</span><br><span class="line">                  cpumask_first(policy-&gt;related_cpus));</span><br></pre></td></tr></table></figure>
+<p>首先通过kobject_init创建并初始化policy-&gt;kobj，主要是初始化ktype。ktype_cpufreq是一个结构体，定义了要显示的属性文件，它的内容下一节再分析。<br>第二步是通过kobject_add把policy-&gt;kobj添加到cpufreq_global_kobject上，并指定目录名。我们假设要挂到cpu0上，这样创建后的路径为：“/sys/devices/system/cpu/cpufreq/policy0”。<br>也可以用kobject_init_add一次完成两个操作。</p>
+<h3 id="创建属性文件"><a href="#创建属性文件" class="headerlink" title="创建属性文件"></a>创建属性文件</h3><h4 id="cpufreq的实现方式"><a href="#cpufreq的实现方式" class="headerlink" title="cpufreq的实现方式"></a>cpufreq的实现方式</h4><h5 id="通过数组批量创建属性文件"><a href="#通过数组批量创建属性文件" class="headerlink" title="通过数组批量创建属性文件"></a>通过数组批量创建属性文件</h5><p>上面说道了属性文件是通过结构体ktype_cpufreq来添加的，这里我们就来看一下这个结构体：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">static const struct sysfs_ops sysfs_ops = &#123;</span><br><span class="line">    .show   = show,</span><br><span class="line">    .store  = store,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">static struct attribute *default_attrs[] = &#123;</span><br><span class="line">    &amp;cpuinfo_min_freq.attr, </span><br><span class="line">    &amp;cpuinfo_max_freq.attr,</span><br><span class="line">    &amp;cpuinfo_transition_latency.attr,</span><br><span class="line">    &amp;scaling_min_freq.attr,</span><br><span class="line">    &amp;scaling_max_freq.attr,</span><br><span class="line">    &amp;affected_cpus.attr,</span><br><span class="line">    &amp;related_cpus.attr,</span><br><span class="line">    &amp;scaling_governor.attr,</span><br><span class="line">    &amp;scaling_driver.attr,</span><br><span class="line">    &amp;scaling_available_governors.attr,</span><br><span class="line">    &amp;scaling_setspeed.attr,</span><br><span class="line">    NULL </span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">static struct kobj_type ktype_cpufreq = &#123; </span><br><span class="line">    .sysfs_ops  = &amp;sysfs_ops,</span><br><span class="line">    .default_attrs  = default_attrs,</span><br><span class="line">    .release    = cpufreq_sysfs_release,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>ktype_cpufreq中有三个成员变量：<br>release用于释放资源，一般应该不需要；<br>sysfs_ops中实现了两个函数show()与store()，对属性文件读写时调用这两个函数；<br>default_attrs中定义了要显示的属性，是一个struct attribute的指针数组。</p>
+<p>下面以其中的scaling_setspeed为例：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">#define cpufreq_freq_attr_rw(_name)     \</span><br><span class="line">static struct freq_attr _name =         \</span><br><span class="line">__ATTR(_name, 0644, show_##_name, store_##_name)</span><br><span class="line"></span><br><span class="line">cpufreq_freq_attr_rw(scaling_setspeed);</span><br></pre></td></tr></table></figure></p>
+<p>上面的代码展开后为：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">static struct freq_attr scaling_setspeed = __ATTR(scaling_setspeed, 0644, show_scaling_setspeed, store_scaling_setspeed)</span><br></pre></td></tr></table></figure></p>
+<p>__ATTR是sysfs中定义的一个宏，用于初始化freq_attr。这里是为scaling_setspeed指定了show与store两个函数，这样在访问属性文件scaling_setspeed时，会用到这两个函数。</p>
+<p>这里有个问题，上面提到了访问ktype_cpufreq时，会使用sysfs_ops中定义的store与show，怎么这里又为每个节点添加了独立的store与show？</p>
+<p>要解答这个问题，让我们来看看sysfs_ops中的store与show的实现：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    struct cpufreq_policy *policy = to_policy(kobj);</span><br><span class="line">    struct freq_attr *fattr = to_attr(attr);</span><br><span class="line">    ssize_t ret;</span><br><span class="line"></span><br><span class="line">    down_read(&amp;policy-&gt;rwsem);</span><br><span class="line"></span><br><span class="line">    if (fattr-&gt;show)</span><br><span class="line">        ret = fattr-&gt;show(policy, buf);</span><br><span class="line">    else</span><br><span class="line">        ret = -EIO;</span><br><span class="line"></span><br><span class="line">    up_read(&amp;policy-&gt;rwsem);</span><br><span class="line"></span><br><span class="line">    return ret;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t store(struct kobject *kobj, struct attribute *attr,</span><br><span class="line">             const char *buf, size_t count)</span><br><span class="line">&#123;</span><br><span class="line">    struct cpufreq_policy *policy = to_policy(kobj);</span><br><span class="line">    struct freq_attr *fattr = to_attr(attr);</span><br><span class="line">    ssize_t ret = -EINVAL;</span><br><span class="line"></span><br><span class="line">    get_online_cpus();</span><br><span class="line"></span><br><span class="line">    if (!cpu_online(policy-&gt;cpu))</span><br><span class="line">        goto unlock;</span><br><span class="line"></span><br><span class="line">    down_write(&amp;policy-&gt;rwsem);</span><br><span class="line"></span><br><span class="line">    if (fattr-&gt;store)</span><br><span class="line">        ret = fattr-&gt;store(policy, buf, count);</span><br><span class="line">    else</span><br><span class="line">        ret = -EIO;</span><br><span class="line"></span><br><span class="line">    up_write(&amp;policy-&gt;rwsem);</span><br><span class="line">unlock:</span><br><span class="line">    put_online_cpus();</span><br><span class="line"></span><br><span class="line">    return ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>从上面的代码可以看到，访问policy-&gt;kobj时，确实用的是sysfs_ops的store与show，但cpufreq扩展了attribute为freq_attr，用于添加每个属性的show与store函数。顶层的show与store会根据属性的不同，再去调用对应属性的show与store函数。也就是说这个是cpufreq驱动自己的行为，与sysfs无关，当然根据sysfs的实现，应该在sysfs_ops的store与show中通过区分属性名而分别调用不同的行为，一个函数去搞定。</p>
+<h5 id="单独创建创建属性文件"><a href="#单独创建创建属性文件" class="headerlink" title="单独创建创建属性文件"></a>单独创建创建属性文件</h5><p>第一种通过数组attribute创建一组属性文件的优势是方便，劣势是不灵活。比如，某些属性需要根据系统信息决定是否支持。例如，cpufreq中有些支持cpu支持setspeed，有些不支持。这就需要根据cpu类型决定是否创建setspeed属性文件。显然，需要单独的接口来创建单个的属性文件，然后通过判断cpu类型决定是否调用该接口。<br>为了找到这些接口，首先我们来深入到kobject_add来看一看属性文件最终是如何创建的。<br>顺着kobject_add去看，很容易就可以找到create_dir，代码如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">static int create_dir(struct kobject *kobj)</span><br><span class="line">&#123;</span><br><span class="line">    const struct kobj_ns_type_operations *ops;</span><br><span class="line">    int error;</span><br><span class="line"></span><br><span class="line">    error = sysfs_create_dir_ns(kobj, kobject_namespace(kobj));</span><br><span class="line">    if (error)</span><br><span class="line">        return error;</span><br><span class="line"></span><br><span class="line">    error = populate_dir(kobj);</span><br><span class="line">    if (error) &#123;</span><br><span class="line">        sysfs_remove_dir(kobj);</span><br><span class="line">        return error;</span><br><span class="line">    &#125;  </span><br><span class="line">    .....</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static int populate_dir(struct kobject *kobj)</span><br><span class="line">&#123;</span><br><span class="line">    ......</span><br><span class="line">    if (t &amp;&amp; t-&gt;default_attrs) &#123;</span><br><span class="line">        for (i = 0; (attr = t-&gt;default_attrs[i]) != NULL; i++) &#123;</span><br><span class="line">            error = sysfs_create_file(kobj, attr);</span><br><span class="line">            if (error)</span><br><span class="line">                break;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>显然，是通过sysfs_create_<em>**</em>这一组接口最终实现的创建sysfs目录与文件。</p>
+<p>在include/linux/sysfs.ｈ中，提供了一组接口：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">int __must_check sysfs_create_dir_ns(struct kobject *kobj, const void *ns);</span><br><span class="line">int __must_check sysfs_rename_dir_ns(struct kobject *kobj, const char *new_name, const void *new_ns);</span><br><span class="line">int __must_check sysfs_create_mount_point(struct kobject *parent_kobj, const char *name);</span><br><span class="line">int __must_check sysfs_create_file_ns(struct kobject *kobj, const struct attribute *attr, const void *ns);</span><br><span class="line">int __must_check sysfs_create_files(struct kobject *kobj, const struct attribute **attr);</span><br><span class="line">int __must_check sysfs_chmod_file(struct kobject *kobj, const struct attribute *attr, umode_t mode);</span><br><span class="line">int __must_check sysfs_create_bin_file(struct kobject *kobj, const struct bin_attribute *attr);</span><br><span class="line">int __must_check sysfs_create_link(struct kobject *kobj, struct kobject *target, const char *name);</span><br></pre></td></tr></table></figure></p>
+<h4 id="仿照cpufreq自己写一个"><a href="#仿照cpufreq自己写一个" class="headerlink" title="仿照cpufreq自己写一个"></a>仿照cpufreq自己写一个</h4><p>在/sys/devices/system/cpu下创建了一个wicca目录，目录结构如下：<br>wicca<br>|– test1<br>    |– scaling_limit_min<br>    |– scaling_limit_max<br>    |– scaling_get_sqrt<br>    |– scaling_get_factorial<br>    `– scaling_set_value</p>
+<p>可以通过scaling_set_value设置要计算的value，通过scaling_get_sqrt读出其平凡根（因为在kernel中，只能使用int_sqrt，因此结果为整数）。<br>通过limit_min与limit_max设置set_value的范围。<br>scaling_get_factorial通过sysfs_create_file创建，其他属性通过attribute数组创建。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line">#ifndef TEST_SYSFS_H_H</span><br><span class="line">#define TEST_SYSFS_H_H</span><br><span class="line"></span><br><span class="line">#include &lt;linux/module.h&gt;  /* for modules */</span><br><span class="line">#include &lt;linux/blkdev.h&gt;</span><br><span class="line">#include &lt;linux/mount.h&gt;</span><br><span class="line">#include &lt;linux/fsnotify.h&gt;</span><br><span class="line">#include &lt;linux/fs.h&gt;      /* file_operations */</span><br><span class="line">#include &lt;linux/uaccess.h&gt; /* copy_(to,from)_user */</span><br><span class="line">#include &lt;linux/init.h&gt;          /* module_init, module_exit */</span><br><span class="line">#include &lt;linux/slab.h&gt;    /* kmalloc, kfree */</span><br><span class="line">#include &lt;linux/device.h&gt;</span><br><span class="line">#include &lt;linux/cdev.h&gt;</span><br><span class="line">#include &lt;linux/io.h&gt;</span><br><span class="line">#include &lt;linux/debugfs.h&gt;</span><br><span class="line">#include &lt;linux/mm.h&gt;</span><br><span class="line">#include &lt;asm/uaccess.h&gt;</span><br><span class="line">#include &lt;linux/cpu.h&gt;</span><br><span class="line"></span><br><span class="line">struct wicca_sysfs</span><br><span class="line">&#123;</span><br><span class="line">    struct kobject kobj;</span><br><span class="line">    struct rw_semaphore rwsem;</span><br><span class="line">    u32 limit_min;</span><br><span class="line">    u32 limit_max;</span><br><span class="line">    u32 value;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">struct test1_attr &#123;</span><br><span class="line">    struct attribute attr;</span><br><span class="line">    ssize_t (*show)(struct wicca_sysfs*, char *);</span><br><span class="line">    ssize_t (*store)(struct wicca_sysfs*, const char *, size_t count);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">#define wicca_attr_ro(_name)     \</span><br><span class="line">static struct test1_attr _name =         \</span><br><span class="line">__ATTR(_name, 0444, show_##_name, NULL)</span><br><span class="line"></span><br><span class="line">#define wicca_attr_ro_perm(_name, _perm) \</span><br><span class="line">static struct test1_attr _name =         \</span><br><span class="line">__ATTR(_name, _perm, show_##_name, NULL)</span><br><span class="line"></span><br><span class="line">#define wicca_attr_rw(_name)     \</span><br><span class="line">static struct test1_attr _name =         \</span><br><span class="line">__ATTR(_name, 0644, show_##_name, store_##_name)</span><br><span class="line"></span><br><span class="line">#endif /* TEST_SYSFS_H_H */</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br></pre></td><td class="code"><pre><span class="line">/** test_sysfs module</span><br><span class="line"> * this module shall be installed into kernel</span><br><span class="line"> */</span><br><span class="line"></span><br><span class="line">#include &quot;test_sysfs.h&quot;</span><br><span class="line"></span><br><span class="line">static ssize_t store_scaling_limit_min(struct wicca_sysfs *wicca, const char *buf, size_t count)</span><br><span class="line">&#123;</span><br><span class="line">    int ret, temp;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line"></span><br><span class="line">    ret = sscanf(buf, &quot;%u&quot;, &amp;temp);</span><br><span class="line">    if (ret != 1)</span><br><span class="line">    &#123;</span><br><span class="line">        return -EINVAL;</span><br><span class="line">    &#125;</span><br><span class="line">   </span><br><span class="line">    if ((temp &lt; wicca-&gt;limit_max) &amp;&amp; (temp &lt;= 10))</span><br><span class="line">    &#123;</span><br><span class="line">        wicca-&gt;limit_min = temp;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return count;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t show_scaling_limit_min(struct wicca_sysfs *wicca, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__); </span><br><span class="line">    </span><br><span class="line">    return sprintf(buf, &quot;%u\n&quot;, wicca-&gt;limit_min);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">static ssize_t store_scaling_limit_max(struct wicca_sysfs *wicca, const char *buf, size_t count)</span><br><span class="line">&#123;</span><br><span class="line">    int ret, temp;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line"></span><br><span class="line">    ret = sscanf(buf, &quot;%u&quot;, &amp;temp);</span><br><span class="line">    if (ret != 1)</span><br><span class="line">    &#123;</span><br><span class="line">        return -EINVAL;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if ((temp &gt; wicca-&gt;limit_min) &amp;&amp; (temp &lt;= 20))</span><br><span class="line">    &#123;</span><br><span class="line">        wicca-&gt;limit_max = temp;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return count;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t show_scaling_limit_max(struct wicca_sysfs *wicca, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line">    return sprintf(buf, &quot;%u\n&quot;, wicca-&gt;limit_max);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t store_scaling_set_value(struct wicca_sysfs *wicca, const char *buf, size_t count)</span><br><span class="line">&#123;</span><br><span class="line">    int ret, temp;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line"></span><br><span class="line">    ret = sscanf(buf, &quot;%u&quot;, &amp;temp);</span><br><span class="line">    if (ret != 1)</span><br><span class="line">    &#123;</span><br><span class="line">        return -EINVAL;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if ((temp &lt;= wicca-&gt;limit_max) &amp;&amp; (temp &gt;= wicca-&gt;limit_min))</span><br><span class="line">    &#123;</span><br><span class="line">        wicca-&gt;value = temp;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    return count;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t show_scaling_set_value(struct wicca_sysfs *wicca, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line">    return sprintf(buf, &quot;%u\n&quot;, wicca-&gt;value);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t show_scaling_get_sqrt(struct wicca_sysfs *wicca, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line">    return sprintf(buf, &quot;%lu\n&quot;, int_sqrt(wicca-&gt;value));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t show_scaling_get_factorial(struct wicca_sysfs *wicca, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">    u32 tmp;</span><br><span class="line">    u32 i;</span><br><span class="line">    printk(&quot;calling %s\n&quot;, __func__);</span><br><span class="line"></span><br><span class="line">    for (i=0, tmp=1; i&lt;wicca-&gt;value; i++)</span><br><span class="line">    &#123;</span><br><span class="line">        tmp *= (i+1);</span><br><span class="line">    &#125;</span><br><span class="line">    return sprintf(buf, &quot;%u\n&quot;, tmp);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">wicca_attr_rw(scaling_limit_min);</span><br><span class="line">wicca_attr_rw(scaling_limit_max);</span><br><span class="line">wicca_attr_rw(scaling_set_value);</span><br><span class="line">wicca_attr_ro(scaling_get_sqrt);</span><br><span class="line">wicca_attr_ro(scaling_get_factorial);</span><br><span class="line"></span><br><span class="line">static struct attribute *default_attrs[] = &#123;</span><br><span class="line">    &amp;scaling_limit_min.attr,</span><br><span class="line">    &amp;scaling_limit_max.attr,</span><br><span class="line">    &amp;scaling_set_value.attr,</span><br><span class="line">    &amp;scaling_get_sqrt.attr,</span><br><span class="line">	NULL</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">#define to_test1(k) container_of(k, struct wicca_sysfs, kobj)</span><br><span class="line">#define to_attr(a) container_of(a, struct test1_attr, attr)</span><br><span class="line"></span><br><span class="line">static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)</span><br><span class="line">&#123;</span><br><span class="line">	struct wicca_sysfs *test1 = to_test1(kobj);</span><br><span class="line">    struct test1_attr *fattr = to_attr(attr);</span><br><span class="line">	ssize_t ret;</span><br><span class="line"></span><br><span class="line">	down_read(&amp;test1-&gt;rwsem);</span><br><span class="line">    ret = fattr-&gt;show(test1, buf);</span><br><span class="line">	up_read(&amp;test1-&gt;rwsem);</span><br><span class="line"></span><br><span class="line">	return ret;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static ssize_t store(struct kobject *kobj, struct attribute *attr,</span><br><span class="line">		     const char *buf, size_t count)</span><br><span class="line">&#123;</span><br><span class="line">	struct wicca_sysfs *test1 = to_test1(kobj);</span><br><span class="line">    struct test1_attr *fattr = to_attr(attr);</span><br><span class="line">	ssize_t ret = -EINVAL;</span><br><span class="line"></span><br><span class="line">	get_online_cpus();</span><br><span class="line"></span><br><span class="line">    down_write(&amp;test1-&gt;rwsem);</span><br><span class="line">    ret = fattr-&gt;store(test1, buf, count);</span><br><span class="line">    up_write(&amp;test1-&gt;rwsem);</span><br><span class="line"></span><br><span class="line">	put_online_cpus();</span><br><span class="line"></span><br><span class="line">	return ret;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static struct sysfs_ops sysfs_ops = &#123;</span><br><span class="line">	.show	= show,</span><br><span class="line">	.store	= store,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">static struct kobj_type ktype_test1 = &#123;</span><br><span class="line">    .sysfs_ops = &amp;sysfs_ops,</span><br><span class="line">    .default_attrs = default_attrs,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">struct kobject *wicca_global_kobject;</span><br><span class="line">EXPORT_SYMBOL(wicca_global_kobject);</span><br><span class="line"></span><br><span class="line">static int __init sysfs_demon_init(void)</span><br><span class="line">&#123;</span><br><span class="line">    int ret;</span><br><span class="line">    struct wicca_sysfs *test1;</span><br><span class="line"></span><br><span class="line">    wicca_global_kobject = kobject_create_and_add(&quot;wicca&quot;, &amp;cpu_subsys.dev_root-&gt;kobj);</span><br><span class="line">    BUG_ON(!wicca_global_kobject);</span><br><span class="line"></span><br><span class="line">    test1 = kzalloc(sizeof(*test1), GFP_KERNEL);</span><br><span class="line">    if (!test1)</span><br><span class="line">    &#123;</span><br><span class="line">        return -1;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">	ret = kobject_init_and_add(&amp;test1-&gt;kobj, &amp;ktype_test1,</span><br><span class="line">				   wicca_global_kobject, &quot;test%d&quot;, 1);</span><br><span class="line">    if (ret)</span><br><span class="line">    &#123;</span><br><span class="line">        return -1;</span><br><span class="line">    &#125;</span><br><span class="line">	</span><br><span class="line">    init_rwsem(&amp;test1-&gt;rwsem);</span><br><span class="line">    test1-&gt;limit_min = 1;</span><br><span class="line">    test1-&gt;limit_max = 10;</span><br><span class="line">    test1-&gt;value = 3;</span><br><span class="line"></span><br><span class="line">    ret = sysfs_create_file(&amp;test1-&gt;kobj, &amp;scaling_get_factorial.attr);</span><br><span class="line">    if (ret)</span><br><span class="line">    &#123;</span><br><span class="line">        return -1;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return ret;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">static void __exit sysfs_demon_exit(void)</span><br><span class="line">&#123;</span><br><span class="line">    pr_debug(&quot;wicca sysfs exit&quot;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">module_init(sysfs_demon_init);</span><br><span class="line">module_exit(sysfs_demon_exit);</span><br><span class="line"></span><br><span class="line">MODULE_LICENSE(&quot;GPL&quot;);</span><br><span class="line">MODULE_AUTHOR(&quot;Marco Hao&quot;);</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/linux/" rel="tag"># linux</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/01/01/cpufreq-01-basic/" rel="next" title="cpufreq-01-basic">
+                <i class="fa fa-chevron-left"></i> cpufreq-01-basic
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope="" itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/tiger.jpg" alt="Qiang Hao">
+            
+              <p class="site-author-name" itemprop="name">Qiang Hao</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">categories</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+            <div class="links-of-author motion-element">
+                
+                  <span class="links-of-author-item">
+                    <a href="mailto:haoqiang1531@outlook.com" target="_blank" title="E-Mail">
+                      
+                        <i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                  </span>
+                
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#参考文档"><span class="nav-number">1.</span> <span class="nav-text">参考文档</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#基本概念"><span class="nav-number">2.</span> <span class="nav-text">基本概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#sysfs目录结构"><span class="nav-number">3.</span> <span class="nav-text">sysfs目录结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#查看-sys-devices-的目录结构"><span class="nav-number">3.1.</span> <span class="nav-text">查看 /sys/devices/ 的目录结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查看-sys-devices-pci0000-00-的目录结构"><span class="nav-number">3.2.</span> <span class="nav-text">查看 /sys/devices/pci0000:00/ 的目录结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查看-sys-devices-pci0000-00-的目录结构-1"><span class="nav-number">3.3.</span> <span class="nav-text">查看 /sys/devices/pci0000:00/ 的目录结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#从Linux-统一设备模型角度看sysfs"><span class="nav-number">4.</span> <span class="nav-text">从Linux 统一设备模型角度看sysfs</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sysfs-编程实践-以cpufreq为例"><span class="nav-number">5.</span> <span class="nav-text">Sysfs 编程实践 (以cpufreq为例)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#创建子系统目录"><span class="nav-number">5.1.</span> <span class="nav-text">创建子系统目录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#创建policy目录"><span class="nav-number">5.2.</span> <span class="nav-text">创建policy目录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#创建属性文件"><span class="nav-number">5.3.</span> <span class="nav-text">创建属性文件</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#cpufreq的实现方式"><span class="nav-number">5.3.1.</span> <span class="nav-text">cpufreq的实现方式</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#通过数组批量创建属性文件"><span class="nav-number">5.3.1.1.</span> <span class="nav-text">通过数组批量创建属性文件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#单独创建创建属性文件"><span class="nav-number">5.3.1.2.</span> <span class="nav-text">单独创建创建属性文件</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#仿照cpufreq自己写一个"><span class="nav-number">5.3.2.</span> <span class="nav-text">仿照cpufreq自己写一个</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Qiang Hao</span>
+
+  
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-area-chart"></i>
+    </span>
+    
+      <span class="post-meta-item-text">Site words total count&#58;</span>
+    
+    <span title="Site words total count">7.9k</span>
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.4</div>
+
+
+
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i>
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
