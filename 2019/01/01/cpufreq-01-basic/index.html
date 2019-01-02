@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="linux, kernel">
 
 
 
@@ -86,12 +86,12 @@
 <meta property="og:site_name" content="Wicca&#39;s Blog">
 <meta property="og:description" content="基本原理对CPU core来说，功耗和性能是一对不可调和的矛盾，通过调整CPU的电压和频率，可以在功耗和性能之间找一个平衡点。由于调整是在系统运行的过程中，因此cpufreq framework的功能也称作动态电压/频率调整（Dynamic Voltage/Frequency Scaling，DVFS）。">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="https://fireaxe-hq.github.io/2019/01/01/cpufreq-01-basic/cpufreq-framework.png">
-<meta property="og:updated_time" content="2019-01-01T17:13:11.198Z">
+<meta property="og:image" content="http://wx4.sinaimg.cn/mw690/007xRyMqly1fys00lpx74j30cw0dcdg6.jpg">
+<meta property="og:updated_time" content="2019-01-02T03:08:26.774Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="cpufreq-01-basic">
 <meta name="twitter:description" content="基本原理对CPU core来说，功耗和性能是一对不可调和的矛盾，通过调整CPU的电压和频率，可以在功耗和性能之间找一个平衡点。由于调整是在系统运行的过程中，因此cpufreq framework的功能也称作动态电压/频率调整（Dynamic Voltage/Frequency Scaling，DVFS）。">
-<meta name="twitter:image" content="https://fireaxe-hq.github.io/2019/01/01/cpufreq-01-basic/cpufreq-framework.png">
+<meta name="twitter:image" content="http://wx4.sinaimg.cn/mw690/007xRyMqly1fys00lpx74j30cw0dcdg6.jpg">
 
 
 
@@ -391,7 +391,7 @@
       
         <h1 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h1><p>对CPU core来说，功耗和性能是一对不可调和的矛盾，通过调整CPU的电压和频率，可以在功耗和性能之间找一个平衡点。由于调整是在系统运行的过程中，因此cpufreq framework的功能也称作动态电压/频率调整（Dynamic Voltage/Frequency Scaling，DVFS）。<br><a id="more"></a></p>
 <p>cpufreq framework的软件架构如下面图片所示：</p>
-<p><img src="/2019/01/01/cpufreq-01-basic/cpufreq-framework.png" alt="cpufreq framework" title="cpufreq framework"></p>
+<p><img src="http://wx4.sinaimg.cn/mw690/007xRyMqly1fys00lpx74j30cw0dcdg6.jpg" alt="cpufreq framework" title="cpufreq framework"></p>
 <p>对上，cpufreq framework以sysfs的形式，向用户空间提供cpu frequency的查询、控制等接口。同时，在频率改变的时候，通过notifier通知关心的driver。<br>对进程调度器，cpufreq framework也提供了对应借口，供调度器根据任务调度需求，对cpu频率进行调整。接口形式未知。<br>内部，cpufreq framework包括cpufreq core、cpufreq driver、cpufreq governors、cpufreq stats等模块。<br>对下，cpufreq framework基于cpu subsystem driver、OPP、clock framework、regulator framework等模块，提供对CPU core频率和电压的控制。这一部分主要由cpufreq driver实现。</p>
 <h1 id="用户态使用方法"><a href="#用户态使用方法" class="headerlink" title="用户态使用方法"></a>用户态使用方法</h1><h2 id="cpufreq提供给用户空间的接口"><a href="#cpufreq提供给用户空间的接口" class="headerlink" title="cpufreq提供给用户空间的接口"></a>cpufreq提供给用户空间的接口</h2><p>cpufreq framework通过sysfs向用户空间提供接口，具体如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">/sys/devices/system/cpu/cpu0/cpufreq/</span><br><span class="line">|-- affected_cpus</span><br><span class="line">|-- cpuinfo_cur_freq</span><br><span class="line">|-- cpuinfo_max_freq</span><br><span class="line">|-- cpuinfo_min_freq</span><br><span class="line">|-- cpuinfo_transition_latency</span><br><span class="line">|-- related_cpus</span><br><span class="line">|-- scaling_available_frequencies</span><br><span class="line">|-- scaling_available_governors</span><br><span class="line">|-- scaling_cur_freq</span><br><span class="line">|-- scaling_driver</span><br><span class="line">|-- scaling_governor</span><br><span class="line">|-- scaling_max_freq</span><br><span class="line">|-- scaling_min_freq</span><br><span class="line">|-- scaling_setspeed</span><br><span class="line">`—stats</span><br><span class="line">    |-- time_in_state</span><br><span class="line">    |-- total_trans</span><br><span class="line">    `-- trans_table</span><br></pre></td></tr></table></figure></p>
 <h3 id="“cpufreq”目录"><a href="#“cpufreq”目录" class="headerlink" title="“cpufreq”目录"></a>“cpufreq”目录</h3><p>在kernel的模型中，cpufreq被抽象为cpu device的一个interface，因此它位于对应的cpu目录（/sys/devices/system/cpu/cpuX）下面。<br>有些平台，所有cpu core的频率和电压时统一控制的，即改变某个core上的频率，其它core同样受影响。此时只需要实现其中一个core（通常为cpu0）的cpufreq即可，其它core的cpufreq直接是cpu0的符号链接。因此，使用这些API时，随便进入某一个cpu下面的cpufreq目录即可。（目前常用手机芯片的big.LITTLE中四个小核统一控制，四个大核统一控制）<br>而另一些些平台，不同core可以单独控制，这时不同cpu目录下的cpufreq就不一样了。（我用的ThinkPad T450s中，i7的四个核独立控制）<br>被统一控制的核组成一个cluster，因此cpufreq的调度单位为cluster。<br>到底某一个cpufreq可以控制多少cpu core呢？可以通过cpufreq/affected_cpus和cpufreq/related_cpus两个文件查看，其中的区别是：affected_cpus表示该cpufreq影响到哪些cpu core（没有显示处于offline状态的cpu），related_cpus则包括了online+offline的所有core。</p>
@@ -725,8 +725,6 @@
   
 
 
-  
-
 
 
 
@@ -765,11 +763,6 @@
   
   
     <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
-  
-
-  
-  
-    <script type="text/javascript" src="/lib/canvas-nest/canvas-nest.min.js"></script>
   
 
 
